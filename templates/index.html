@@ -23,6 +23,10 @@
                 <input type="text" id="catalogNumber" placeholder="e.g., 136" value="136">
             </div>
             <div class="input-group">
+                <label for="section">Section Number (optional):</label>
+                <input type="text" id="section" placeholder="e.g., 001">
+            </div>
+            <div class="input-group">
                 <label for="email">Email for Notifications (optional):</label>
                 <input type="email" id="email" placeholder="your@email.com">
             </div>
@@ -31,11 +35,26 @@
         <div id="results" class="results-container"></div>
     </div>
 
+    <!-- Add this right after the container div -->
+    <div id="notificationModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Subscribe to Notifications</h2>
+            <p>Enter your email to get notified when this section becomes available:</p>
+            <div class="input-group">
+                <input type="email" id="notificationEmail" placeholder="your@email.com">
+            </div>
+            <button onclick="subscribeToNotifications()">Subscribe</button>
+            <p id="modalMessage" class="modal-message"></p>
+        </div>
+    </div>
+
     <script>
         async function checkAvailability() {
             const term = document.getElementById('term').value;
             const subject = document.getElementById('subject').value;
             const catalogNumber = document.getElementById('catalogNumber').value;
+            const section = document.getElementById('section').value;
             const email = document.getElementById('email').value;
 
             try {
@@ -48,6 +67,7 @@
                         term,
                         subject,
                         catalogNumber,
+                        section,
                         email
                     }),
                 });
@@ -74,34 +94,114 @@
 
         function displayResults(sections) {
             const resultsDiv = document.getElementById('results');
-            let html = '<table><thead><tr>';
-            const headers = ['Section', 'Component', 'Class #', 'Capacity', 'Enrolled', 'Available', 'Status', 'Location', 'Time'];
             
-            headers.forEach(header => {
-                html += `<th>${header}</th>`;
-            });
-            
-            html += '</tr></thead><tbody>';
+            if (sections.length === 0) {
+                resultsDiv.innerHTML = '<div class="info">No sections found matching your criteria.</div>';
+                return;
+            }
 
+            let html = '<div class="sections-grid">';
+            
             sections.forEach(section => {
                 const statusClass = section.status === 'OPEN' ? 'status-open' : 'status-full';
+                const notificationButton = section.status === 'FULL' ? `
+                    <button class="notification-btn" onclick="showNotificationModal('${section.section}', '${term}', '${subject}', '${catalogNumber}')">
+                        Get Notified When Available
+                    </button>
+                ` : '';
+                
                 html += `
-                    <tr>
-                        <td>${section.section}</td>
-                        <td>${section.component}</td>
-                        <td>${section.classNumber}</td>
-                        <td>${section.capacity}</td>
-                        <td>${section.enrolled}</td>
-                        <td>${section.available}</td>
-                        <td class="${statusClass}">${section.status}</td>
-                        <td>${section.location}</td>
-                        <td>${section.time}</td>
-                    </tr>
+                    <div class="section-card ${statusClass}-card">
+                        <div class="section-header">
+                            <h2>Section ${section.section}</h2>
+                            <span class="status-badge ${statusClass}">${section.status}</span>
+                        </div>
+                        <div class="section-details">
+                            <p><strong>Component:</strong> ${section.component || 'N/A'}</p>
+                            <p><strong>Class Number:</strong> ${section.classNumber || 'N/A'}</p>
+                            <p><strong>Instructor:</strong> ${section.instructor || 'TBA'}</p>
+                            <p><strong>Schedule:</strong> ${section.days || 'TBA'} ${section.time || 'TBA'}</p>
+                            <p><strong>Location:</strong> ${section.location || 'TBA'}</p>
+                            <div class="enrollment-info">
+                                <div class="enrollment-bar">
+                                    <div class="enrolled" style="width: ${(section.enrolled / section.capacity) * 100}%"></div>
+                                </div>
+                                <p>${section.enrolled}/${section.capacity} (${section.available} spots available)</p>
+                            </div>
+                            ${section.enrollConsentRequired !== 'None' ? 
+                                `<p class="consent-warning"><strong>Note:</strong> ${section.enrollConsentRequired}</p>` : ''}
+                            ${notificationButton}
+                        </div>
+                    </div>
                 `;
             });
 
-            html += '</tbody></table>';
+            html += '</div>';
             resultsDiv.innerHTML = html;
+        }
+
+        // Add these new functions
+        let currentSection = null;
+
+        function showNotificationModal(section, term, subject, catalogNumber) {
+            currentSection = {
+                section: section,
+                term: term,
+                subject: subject,
+                catalogNumber: catalogNumber
+            };
+            const modal = document.getElementById('notificationModal');
+            modal.style.display = 'block';
+            document.getElementById('notificationEmail').value = '';
+            document.getElementById('modalMessage').textContent = '';
+        }
+
+        async function subscribeToNotifications() {
+            const email = document.getElementById('notificationEmail').value;
+            if (!email) {
+                document.getElementById('modalMessage').textContent = 'Please enter an email address';
+                return;
+            }
+
+            try {
+                const response = await fetch('/subscribe-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        ...currentSection
+                    }),
+                });
+
+                const data = await response.json();
+                document.getElementById('modalMessage').textContent = data.message;
+                
+                if (data.success) {
+                    document.getElementById('modalMessage').className = 'modal-message success';
+                    setTimeout(() => {
+                        document.getElementById('notificationModal').style.display = 'none';
+                    }, 2000);
+                } else {
+                    document.getElementById('modalMessage').className = 'modal-message error';
+                }
+            } catch (error) {
+                document.getElementById('modalMessage').textContent = 'Error subscribing to notifications';
+                document.getElementById('modalMessage').className = 'modal-message error';
+            }
+        }
+
+        // Close modal when clicking the X or outside the modal
+        document.querySelector('.close').onclick = function() {
+            document.getElementById('notificationModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('notificationModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
         }
     </script>
 </body>

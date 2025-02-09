@@ -30,4 +30,11 @@ wheels/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log 
