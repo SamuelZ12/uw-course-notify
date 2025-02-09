@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UWaterloo Course Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>UWaterloo Course Monitor</h1>
+        <div class="form-container">
+            <div class="input-group">
+                <label for="term">Term Code:</label>
+                <input type="text" id="term" placeholder="e.g., 1251" value="1251">
+            </div>
+            <div class="input-group">
+                <label for="subject">Subject:</label>
+                <input type="text" id="subject" placeholder="e.g., CS" value="CS">
+            </div>
+            <div class="input-group">
+                <label for="catalogNumber">Course Number:</label>
+                <input type="text" id="catalogNumber" placeholder="e.g., 136" value="136">
+            </div>
+            <div class="input-group">
+                <label for="email">Email for Notifications (optional):</label>
+                <input type="email" id="email" placeholder="your@email.com">
+            </div>
+            <button onclick="checkAvailability()">Check Availability</button>
+        </div>
+        <div id="results" class="results-container"></div>
+    </div>
+
+    <script>
+        async function checkAvailability() {
+            const term = document.getElementById('term').value;
+            const subject = document.getElementById('subject').value;
+            const catalogNumber = document.getElementById('catalogNumber').value;
+            const email = document.getElementById('email').value;
+
+            try {
+                const response = await fetch('/check-availability', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        term,
+                        subject,
+                        catalogNumber,
+                        email
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data.sections);
+                } else {
+                    document.getElementById('results').innerHTML = `
+                        <div class="error">
+                            Error: ${data.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = `
+                    <div class="error">
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayResults(sections) {
+            const resultsDiv = document.getElementById('results');
+            let html = '<table><thead><tr>';
+            const headers = ['Section', 'Component', 'Class #', 'Capacity', 'Enrolled', 'Available', 'Status', 'Location', 'Time'];
+            
+            headers.forEach(header => {
+                html += `<th>${header}</th>`;
+            });
+            
+            html += '</tr></thead><tbody>';
+
+            sections.forEach(section => {
+                const statusClass = section.status === 'OPEN' ? 'status-open' : 'status-full';
+                html += `
+                    <tr>
+                        <td>${section.section}</td>
+                        <td>${section.component}</td>
+                        <td>${section.classNumber}</td>
+                        <td>${section.capacity}</td>
+                        <td>${section.enrolled}</td>
+                        <td>${section.available}</td>
+                        <td class="${statusClass}">${section.status}</td>
+                        <td>${section.location}</td>
+                        <td>${section.time}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            resultsDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html> 
